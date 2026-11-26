@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Tentation</title>
+</head>
+<body style="background:black;color:red;text-align:center;">
+    <h1>TENTATION</h1>
+    <h2>Charlene & William</h2>
+    <button onclick="alert('Ça fonctionne !')">
+        Commencer
+    </button>
+</body>
+</html>
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tentation</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  background: #100508;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 20px;
+}
+main { max-width: 500px; margin: auto; }
+h1 { color: #ff304f; letter-spacing: 5px; }
+.panel {
+  background: #251015;
+  padding: 20px;
+  border-radius: 20px;
+  margin: 15px 0;
+}
+button {
+  background: #b91432;
+  color: white;
+  border: none;
+  padding: 15px;
+  border-radius: 12px;
+  font-size: 16px;
+  margin: 5px 0;
+  width: 100%;
+  cursor: pointer;
+}
+input, textarea, select {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  background: #391820;
+  color: white;
+  border: 1px solid #783344;
+  border-radius: 8px;
+  font-size: 16px;
+}
+#timer {
+  font-size: 55px;
+  color: #ff4055;
+  margin: 20px 0;
+}
+#challenge { font-size: 23px; line-height: 1.5; }
+small { color: #dda5af; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>TENTATION</h1>
+<p>Charlene & William</p>
+
+<section id="home" class="panel">
+  <h2>Votre soirée privée</h2>
+  <p>20 défis · 45 minutes</p>
+  <button onclick="startGame()">Commencer une partie</button>
+  <button onclick="show('editor')">Mes cartes personnelles</button>
+</section>
+
+<section id="editor" class="panel" hidden>
+  <h2>Créer un défi</h2>
+
+  <select id="player">
+    <option>Charlene</option>
+    <option>William</option>
+  </select>
+
+  <textarea id="content" rows="4"
+    placeholder="Écris ton défi personnel"></textarea>
+
+  <select id="category">
+    <option>Sensualité</option>
+    <option>Photo</option>
+    <option>Vidéo</option>
+    <option>Sextoy</option>
+    <option>Intimité</option>
+  </select>
+
+  <button onclick="saveCard()">Enregistrer la carte</button>
+  <p id="message" role="status"></p>
+  <h3>Mes cartes enregistrées</h3>
+  <div id="saved"></div>
+  <button onclick="show('home')">Retour</button>
+</section>
+
+<section id="game" class="panel" hidden>
+  <small id="progress"></small>
+  <h2 id="currentPlayer"></h2>
+  <small id="currentCategory"></small>
+  <p id="challenge"></p>
+  <div id="timer">00:00</div>
+  <button onclick="toggleTimer()" id="timerButton">
+    Démarrer
+  </button>
+  <button onclick="nextCard()">Défi suivant / Passer</button>
+  <button onclick="stopGame()">Terminer la partie</button>
+</section>
+
+<section id="end" class="panel" hidden>
+  <h2>Partie terminée</h2>
+  <button onclick="show('home')">Accueil</button>
+</section>
+
+<p><small>Chaque défi est facultatif.
+Photos et vidéos uniquement avec accord mutuel.</small></p>
+
+</main>
+<script>
+let cards = [];
+let deck = [];
+let position = 0;
+let remaining = 0;
+let interval = null;
+let deadline = 0;
+
+const defaults = [
+  ["Embrasse ton partenaire dans le cou.", "Sensualité"],
+  ["Masse doucement les épaules de ton partenaire.", "Sensualité"],
+  ["Retire un vêtement.", "Sensualité"],
+  ["Prends une photo séduisante avec son accord.", "Photo"],
+  ["Prépare votre accessoire intime.", "Sextoy"],
+  ["Réalise une courte vidéo de séduction.", "Vidéo"],
+  ["Masse le dos de ton partenaire.", "Sensualité"],
+  ["Embrasse longuement ton partenaire.", "Sensualité"]
+];
+
+function el(id) {
+  return document.getElementById(id);
+}
+
+try {
+  cards = JSON.parse(localStorage.getItem("tentationCards") || "[]");
+  if (!Array.isArray(cards)) cards = [];
+} catch (e) {
+  cards = [];
+}
+
+function show(id) {
+  ["home", "editor", "game", "end"].forEach(name => {
+    el(name).hidden = name !== id;
+  });
+  if (id === "editor") renderCards();
+}
+
+function persist() {
+  try {
+    localStorage.setItem("tentationCards", JSON.stringify(cards));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function saveCard() {
+  const content = el("content").value.trim();
+  if (!content) {
+    el("message").textContent = "Écris d'abord ton défi.";
+    return;
+  }
+  cards.push({
+    player: el("player").value,
+    text: content,
+    category: el("category").value
+  });
+  const saved = persist();
+  el("message").textContent = saved
+    ? "Carte enregistrée !"
+    : "Carte ajoutée, mais sauvegarde permanente indisponible.";
+  el("content").value = "";
+  renderCards();
+}
+
+function renderCards() {
+  const container = el("saved");
+  container.replaceChildren();
+  cards.forEach((card, i) => {
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    const text = document.createElement("p");
+    text.textContent = card.player + " : " + card.text;
+    const button = document.createElement("button");
+    button.textContent = "Supprimer";
+    button.onclick = () => {
+      if (!confirm("Supprimer cette carte ?")) return;
+      cards.splice(i, 1);
+      const saved = persist();
+      el("message").textContent = saved
+        ? "Carte supprimée."
+        : "Sauvegarde permanente indisponible.";
+      renderCards();
+    };
+    panel.append(text, button);
+    container.append(panel);
+  });
+}
+
+function shuffle(items) {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+function startGame() {
+  pauseTimer();
+  deck = [];
+  position = 0;
+
+  const pools = {};
+  ["Charlene", "William"].forEach(player => {
+    const personal = cards.filter(c => c.player === player);
+    pools[player] = shuffle(personal.length ? personal :
+      defaults.map(d => ({
+        player: player, text: d[0], category: d[1]
+      }))
+    );
+  });
+
+  for (let i = 0; i < 20; i++) {
+    const player = i % 2 === 0 ? "Charlene" : "William";
+    const pool = pools[player];
+    deck.push({
+      ...pool[Math.floor(i / 2) % pool.length],
+      duration: i < 10 ? 120 : 150
+    });
+  }
+  show("game");
+  displayCard();
+}
+
+function displayCard() {
+  pauseTimer();
+  const card = deck[position];
+  remaining = card.duration;
+  el("progress").textContent = "Défi " + (position + 1) + " / 20";
+  el("currentPlayer").textContent = "À toi, " + card.player;
+  el("currentCategory").textContent = card.category;
+  el("challenge").textContent = card.text;
+  updateTimer();
+}
+
+function updateTimer() {
+  const m = Math.floor(remaining / 60);
+  const s = remaining % 60;
+  el("timer").textContent =
+    String(m).padStart(2, "0") + ":" +
+    String(s).padStart(2, "0");
+}
+
+function pauseTimer() {
+  clearInterval(interval);
+  interval = null;
+  el("timerButton").textContent = "Démarrer / Reprendre";
+}
+
+function toggleTimer() {
+  if (interval !== null) {
+    pauseTimer();
+    return;
+  }
+  if (remaining <= 0) return;
+  deadline = Date.now() + remaining * 1000;
+  el("timerButton").textContent = "Pause";
+
+  interval = setInterval(() => {
+    remaining = Math.max(0,
+      Math.ceil((deadline - Date.now()) / 1000));
+    updateTimer();
+    if (remaining === 0) {
+      pauseTimer();
+      el("timerButton").textContent = "Temps écoulé";
+    }
+  }, 200);
+}
+
+function nextCard() {
+  pauseTimer();
+  position++;
+  if (position >= deck.length) {
+    show("end");
+  } else {
+    displayCard();
+  }
+}
+
+function stopGame() {
+  pauseTimer();
+  show("home");
+}
+</script>
+</body>
+</html>
